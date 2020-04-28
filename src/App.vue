@@ -1,7 +1,9 @@
 <template>
   <div id="app">
     <div class='tree'>
-      <k-tree :data='treeData' node-key="code" :defaultProps="defaultProps" default-expand-all :treeOption='treeOption' :checkCode='checkCode'></k-tree>
+      <el-input placeholder="输入关键字进行过滤" v-model="filterText"></el-input>
+      <k-tree :data='treeData' :treeOption='treeOption' :checkCode='checkCode' node-key="code" @node-click='nodeClickEvent' :defaultProps="defaultProps" default-expand-all
+        :render-content='renderContent' ref='treeDOM'></k-tree>
     </div>
   </div>
 </template>
@@ -18,7 +20,8 @@ export default {
   data() {
     return {
       treeData: [],
-      checkCode:'EC01030104404090',
+      checkCode: '',
+      filterText: '',
       treeOption: {
         height: 30
       },
@@ -29,15 +32,22 @@ export default {
     }
   },
 
+  watch: {
+    filterText(val) {
+      this.$refs.treeDOM.filter(val)
+    }
+  },
+
   created() {
     const vm = this
     vm.getTreeData()
   },
 
   methods: {
+    // 获取数据
     getTreeData() {
       const vm = this
-      var instance = axios.create()
+      const instance = axios.create()
       instance.defaults.headers.common['userId'] = '1'
       instance.defaults.headers.common['userName'] = 'admin'
       instance.defaults.headers.common['token'] = '21232f297a57a5a743894a0e4a801fc3'
@@ -52,6 +62,26 @@ export default {
         .catch(function(error) {
           console.log(error)
         })
+    },
+
+    // 点击事件
+    nodeClickEvent(nodeData) {
+      console.log(nodeData)
+    },
+
+    // 自定义渲染函数
+    renderContent(h, nodeData) {
+      return (
+        <div>
+          <span on-click={() => this.labelClickEvent(nodeData)}>{nodeData.label}</span>
+          <i class="emit">+</i>
+        </div>
+      )
+    },
+
+    // 点击名称
+    labelClickEvent(data) {
+      console.log(data)
     }
   }
 }
@@ -68,7 +98,7 @@ export default {
 }
 
 .tree {
-  height: 440px;
+  height: 400px;
   width: 300px;
   border: 1px solid #ddd;
   margin: 250px auto;
@@ -76,14 +106,14 @@ export default {
   font-size: 12px;
 }
 
-ul {
-  margin: 0;
-  padding: 0;
+.scrollbar {
+  height: 360px;
+  overflow: auto;
   background: #f5f5f5;
 }
 
-li {
-  list-style: none;
+.scrollbar .emit {
   cursor: pointer;
+  padding: 0 5px;
 }
 </style>
