@@ -2,7 +2,7 @@
   <div class='scrollbar' ref='scrollbarDOM' @scroll="scrollEvent">
     <div class='scrollBox' :style='{height:computedHeight}'>
       <ul :style="{transform:viewScrollY}">
-        <k-tree-node v-for="val in treeData" :key='val[nodeKey]' v-show="val.visibleSate" :class='{"active":activeCode===val[nodeKey]}' :title='val.label' :childrenKey='childrenKey'
+        <k-tree-node v-for="val in treeData" :key='val[nodeKey]' v-show="val.visibleSate" :class='{"active":activeCode.includes(val[nodeKey])}' :title='val.label' :childrenKey='childrenKey'
           :labelKey='labelKey' :nodeData='val' :treeOption='treeOption' :indent='indent' :render-content='renderContent' @click.native='treeNodeClick(val)'></k-tree-node>
       </ul>
     </div>
@@ -23,53 +23,47 @@ export default {
       treeAllData: [], // 所有数据,只作为根据(过滤),不去操作
       treeTempData: [], // 临时数据
       treeData: [],
-
       childrenKey: null, // 渲染childrenKey
       labelKey: null, // 渲染labelKey
-      activeCode: null, // 选中项
-
+      activeCode: [], // 选中项
       treeItemHeight: 0, // 节点高度
       treeSzieViewArea: null, // 可视区:节点个数
       treeViewHeight: null, // 可视区: 高度
       viewScrollY: 0 // 可滚动总高度
     }
   },
-
   props: {
     // tree :数据
     data: {
       type: Array,
       required: true
     },
-
     // tree: 渲染字段
     defaultProps: {
       type: Object,
       required: true
     },
-
     // tree: 水平缩进
     indent: {
       type: Number,
       default: 10
     },
-
     // tree: 是否默认展开所有
     defaultExpandAll: {
       type: Boolean,
       required: false
     },
-
     // tree: 每个节点唯一标识属性(高亮,选中,必须传入nodeKey)
     nodeKey: {
       type: String
     },
-
     // tree: 选中的节点code
     checkCode: {
-      type: String
+      type: Array,
+      default: () => {
+        return []
+      }
     },
-
     // tree: 属性
     treeOption: {
       type: Object,
@@ -77,26 +71,31 @@ export default {
         return { height: 30 }
       }
     },
-
     // tree: 自定义渲染
     renderContent: {
       type: Function
     }
   },
-
   watch: {
     data: function(newVal, oldVal) {
       const vm = this
-      if (newVal && oldVal.length === 0) {
-        // 是否全部展开
-        vm.defaultExpandAll ? vm.expandAllEvent(newVal) : vm.unExpandAllEvent(newVal)
-        vm.treeTempData = [...vm.treeAllData]
-        // 选中节点
-        vm.checkCode ? vm.checkCodeIntoView() : vm.scrollEvent()
-      }
+      let datas = JSON.parse(JSON.stringify(newVal))
+
+      // 数据变化,清除之前数据
+      vm.treeAllData = []
+
+      // 是否全部展开
+      vm.defaultExpandAll ? vm.expandAllEvent(datas) : vm.unExpandAllEvent(datas)
+      vm.treeTempData = [...vm.treeAllData]
+
+      // 选中节点(可能多个)
+      vm.checkCode&&vm.checkCode.length > 0 ? vm.checkCodeIntoView() : vm.scrollEvent()
+    },
+
+    checkCode:function(newVal, oldVal){
+      this.activeCode = newVal
     }
   },
-
   computed: {
     // 筛选可见元素 => 所欲
     filterVisibelData() {
@@ -107,16 +106,13 @@ export default {
       return this.filterVisibelData.length * this.treeItemHeight + 'px'
     }
   },
-
   components: {
     kTreeNode
   },
-
   mounted() {
     const vm = this
     vm.initTreeAttr()
   },
-
   methods: {
     // tree属性: 初始化
     initTreeAttr() {
@@ -124,14 +120,13 @@ export default {
       const scrollbarDOM = vm.$refs.scrollbarDOM
       vm.childrenKey = vm.defaultProps.children
       vm.labelKey = vm.defaultProps.label
-      vm.activeCode = vm.checkCode
+      // vm.activeCode = vm.checkCode
       vm.treeItemHeight = vm.treeOption.height
       vm.treeViewHeight = scrollbarDOM.offsetHeight
       vm.treeSzieViewArea = Math.ceil(vm.treeViewHeight / vm.treeItemHeight)
     },
-
     // 递归数据
-    recursion(data, level, expandFlag) {
+    recursion(data = [], level, expandFlag) {
       const vm = this
       data.forEach(item => {
         vm.$set(item, 'level', level)
@@ -143,25 +138,22 @@ export default {
         }
       })
     },
-
-    // 选中节点(回填): 在可视区
+    // 选中节点(回填): 在可视区(默认选中的第一个)
     checkCodeIntoView() {
       const vm = this
-      let targetIndex = vm.treeAllData.findIndex(val => val[vm.nodeKey] === vm.checkCode)
+      let targetIndex = vm.treeAllData.findIndex(val => val[vm.nodeKey] === vm.checkCode[0])
       vm.$nextTick(() => {
         vm.$refs.scrollbarDOM.scrollTop = targetIndex * vm.treeItemHeight // 设置滚动距离
         const scrooTop = vm.$refs.scrollbarDOM.scrollTop - vm.treeViewHeight // 滚动高度 > 可视区 => 开始触发加载数据
         vm.setViewData(scrooTop > 0 ? scrooTop : 0)
       })
     },
-
     // 可视区: 滚动事件
     scrollEvent() {
       const vm = this
       const scrooTop = vm.$refs.scrollbarDOM.scrollTop - vm.treeViewHeight // 滚动高度 > 可视区 => 开始触发加载数据
       vm.setViewData(scrooTop > 0 ? scrooTop : 0)
     },
-
     // 可视区: 数据
     setViewData(scrooTop) {
       const vm = this
@@ -170,13 +162,11 @@ export default {
       vm.treeData = vm.filterVisibelData.slice(start, end)
       vm.viewScrollY = `translateY(${start * vm.treeItemHeight}px)`
     },
-
     // tree节点: 全部展开 + 不展开
     expandAllEvent(data) {
       const vm = this
       vm.recursion(data, 1, vm.defaultExpandAll)
     },
-
     unExpandAllEvent(newVal) {
       const vm = this
       newVal.forEach(item => {
@@ -187,34 +177,32 @@ export default {
         vm.recursion(item[vm.childrenKey], 2, vm.defaultExpandAll)
       })
     },
-
     // tree节点点击收缩:  open => 子栏目展开  close => 子孙栏目都隐藏
     treeNodeClick(item) {
       const vm = this
       vm.slideToogleEvent(item)
       // 传入node-key, 选中
       if (vm.nodeKey) {
-        vm.activeCode = item[vm.nodeKey]
+        vm.activeCode = [item[vm.nodeKey]]
       }
       vm.$emit('node-click', item)
-      vm.scrollEvent()
     },
-
     slideToogleEvent(item) {
       const vm = this
       const isExpand = item.expandState
       const childData = item[vm.childrenKey]
-      isExpand ? childData && vm.slideUp(childData) : childData && vm.slideDown(childData)
-      item.expandState = !isExpand
+      if (childData) {
+        isExpand ? vm.slideUp(childData) : vm.slideDown(childData)
+        item.expandState = !isExpand
+        vm.scrollEvent()
+      }
     },
-
     slideDown(data) {
       data.forEach(item => {
         item.visibleSate = true
         item.expandState = false
       })
     },
-
     slideUp(data) {
       const vm = this
       data.forEach(item => {
@@ -225,7 +213,6 @@ export default {
         }
       })
     },
-
     // 过滤
     filter(val) {
       const vm = this
@@ -242,6 +229,10 @@ ul {
   padding: 0;
   li {
     cursor: pointer;
+  }
+  .emit {
+    cursor: pointer;
+    padding: 0 5px;
   }
 }
 </style>
